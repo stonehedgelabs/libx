@@ -6,44 +6,77 @@ import { State, Action } from '../store';
 import BackgroundImg from '../components/BackgroundImg';
 import Content from '../components/Content';
 import SpotifyIcon from '../components/icons/SpotifyIcon';
+import AppleIcon from '../components/icons/AppleIcon';
 import MusicTapeIcon from '../components/icons/MusicTapeIcon';
 import { useDownload } from '../services/Download';
 
-const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
-const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
+const SPOTIFY_REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_CLIENT_ID;
+const APPLE_REDIRECT_URI = import.meta.env.VITE_APPLE_REDIRECT_URI;
 
-const SCOPES = ['playlist-read-private', 'user-library-read'];
-const AUTH_URL = `https://accounts.spotify.com/authorize?response_type=token&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${SCOPES.join('%20')}`;
+const SPOTIFY_SCOPES = ['playlist-read-private', 'user-library-read'];
+const SPOTIFY_AUTH_URL = `https://accounts.spotify.com/authorize?response_type=token&client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}&scope=${SPOTIFY_SCOPES.join('%20')}`;
+
+const APPLE_AUTH_URL = `https://appleid.apple.com/auth/authorize?response_type=code&client_id=${APPLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APPLE_REDIRECT_URI)}&scope=name%20email&response_mode=form_post`;
 
 function Index() {
   const dispatch = useDispatch();
   const { downloadFile } = useDownload();
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [provider, setProvider] = useState<'spotify' | 'apple' | null>(null);
 
   const subtitle = useSelector((state: State) => state.content.subtitle);
   const loading = useSelector((state: State) => state.download.loading);
   const error = useSelector((state: State) => state.download.error);
   const downloadURI = useSelector((state: State) => state.download.downloadURI);
 
-  const onClick = () => {
-    if (!accessToken) {
-      window.location.href = AUTH_URL;
+  const onSpotifyClick = () => {
+    if (!accessToken || provider !== 'spotify') {
+      window.location.href = SPOTIFY_AUTH_URL;
     }
-    if (accessToken) {
-      return downloadFile(accessToken);
+    if (accessToken && provider === 'spotify') {
+      return downloadFile(accessToken, 'spotify');
+    }
+  };
+
+  const onAppleClick = () => {
+    if (!accessToken || provider !== 'apple') {
+      window.location.href = APPLE_AUTH_URL;
+    }
+    if (accessToken && provider === 'apple') {
+      return downloadFile(accessToken, 'apple');
     }
   };
 
   useEffect(() => {
+    // Check for Spotify token in hash
     const fragment = window.location.hash.substring(1);
     const params = new URLSearchParams(fragment);
-    const accessToken = params.get('access_token');
+    const spotifyToken = params.get('access_token');
 
-    setAccessToken(accessToken);
+    if (spotifyToken) {
+      setAccessToken(spotifyToken);
+      setProvider('spotify');
+    }
+
+    // Check for Apple token in query params (from backend callback)
+    const queryParams = new URLSearchParams(window.location.search);
+    const appleToken = queryParams.get('apple_token');
+
+    if (appleToken) {
+      setAccessToken(appleToken);
+      setProvider('apple');
+    }
   }, []);
 
-  const btnTitle = () => {
-    return accessToken ? 'Download' : 'Login';
+  const getBtnTitle = (btnProvider: 'spotify' | 'apple') => {
+    if (accessToken && provider === btnProvider) {
+      return 'Download';
+    }
+    return btnProvider === 'spotify'
+      ? 'Login with Spotify'
+      : 'Login with Apple';
   };
 
   useEffect(() => {
@@ -80,11 +113,17 @@ function Index() {
             {subtitle}
           </Text>
         </Flex>
-        <Flex flexDirection={['column']} w={'80%'} alignItems={'center'}>
-          <Flex flexDirection="column" alignItems="center" w={'100%'} mb={2}>
+        <Flex
+          flexDirection={['column']}
+          w={'80%'}
+          alignItems={'center'}
+          gap={3}
+        >
+          {/* Spotify Button */}
+          <Flex flexDirection="column" alignItems="center" w={'100%'}>
             <Button
-              onClick={onClick}
-              bg="black"
+              onClick={onSpotifyClick}
+              background="linear-gradient(to right, #000000, #1DB954)"
               color="white"
               borderRadius={100}
               display="flex"
@@ -93,14 +132,38 @@ function Index() {
               gap={2}
               h={50}
               w={[150, '100%']}
-              _hover={{ bg: 'gray.700' }}
+              _hover={{ opacity: 0.9 }}
             >
-              {loading && <Spinner />}
-              {!loading && (
+              {loading && provider === 'spotify' && <Spinner />}
+              {!(loading && provider === 'spotify') && (
                 <>
-                  {' '}
                   <SpotifyIcon />
-                  <Text>{btnTitle()}</Text>
+                  <Text>{getBtnTitle('spotify')}</Text>
+                </>
+              )}
+            </Button>
+          </Flex>
+
+          {/* Apple Button */}
+          <Flex flexDirection="column" alignItems="center" w={'100%'}>
+            <Button
+              onClick={onAppleClick}
+              background="linear-gradient(to right, #FA233B, #FB5C74)"
+              color="white"
+              borderRadius={100}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              gap={2}
+              h={50}
+              w={[150, '100%']}
+              _hover={{ opacity: 0.9 }}
+            >
+              {loading && provider === 'apple' && <Spinner />}
+              {!(loading && provider === 'apple') && (
+                <>
+                  <AppleIcon />
+                  <Text>{getBtnTitle('apple')}</Text>
                 </>
               )}
             </Button>

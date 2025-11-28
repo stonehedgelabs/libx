@@ -7,9 +7,12 @@ function useDownload() {
   const dispatch = useDispatch();
 
   const downloadFile = useCallback(
-    async (accessToken: string) => {
-
-      const url = new URL(import.meta.env.VITE_SPOTIFY_REDIRECT_URI);
+    async (accessToken: string, provider: 'spotify' | 'apple' = 'spotify') => {
+      const url = new URL(
+        provider === 'spotify'
+          ? import.meta.env.VITE_SPOTIFY_REDIRECT_URI
+          : import.meta.env.VITE_APPLE_REDIRECT_URI
+      );
 
       if (!accessToken) return;
       dispatch({
@@ -22,11 +25,12 @@ function useDownload() {
         payload: null,
       });
 
-      const filename = `libx-export-${v4()}.csv`;
+      const filename = `libx-${provider}-export-${v4()}.csv`;
+      const endpoint = provider === 'spotify' ? 'spotify' : 'apple';
 
       try {
         const response = await fetch(
-          `https://${url.host}/api/spotify/download/${filename}?t=${accessToken}`,
+          `https://${url.host}/api/${endpoint}/download/${filename}?t=${accessToken}`,
           {
             method: 'GET',
             headers: {
