@@ -14,7 +14,7 @@ function ContentContainer({ children }: ContentContainerProps) {
         bg="#075049"
         opacity="0.5"
         position="absolute"
-        borderRadius={[25, 75]}
+        rounded={'xl'}
         boxShadow="lg"
       />
       <Flex

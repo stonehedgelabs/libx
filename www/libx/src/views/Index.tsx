@@ -16,7 +16,7 @@ const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_CLIENT_ID;
 const APPLE_REDIRECT_URI = import.meta.env.VITE_APPLE_REDIRECT_URI;
 
 const SPOTIFY_SCOPES = ['playlist-read-private', 'user-library-read'];
-const SPOTIFY_AUTH_URL = `https://accounts.spotify.com/authorize?response_type=token&client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}&scope=${SPOTIFY_SCOPES.join('%20')}`;
+const SPOTIFY_AUTH_URL = `https://accounts.spotify.com/authorize?response_type=code&client_id=${SPOTIFY_CLIENT_ID}&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}&scope=${SPOTIFY_SCOPES.join('%20')}`;
 
 const APPLE_AUTH_URL = `https://appleid.apple.com/auth/authorize?response_type=code&client_id=${APPLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(APPLE_REDIRECT_URI)}&scope=name%20email&response_mode=form_post`;
 
@@ -50,19 +50,15 @@ function Index() {
   };
 
   useEffect(() => {
-    // Check for Spotify token in hash
-    const fragment = window.location.hash.substring(1);
-    const params = new URLSearchParams(fragment);
-    const spotifyToken = params.get('access_token');
+    // Check for tokens in query params (from backend callback)
+    const queryParams = new URLSearchParams(window.location.search);
+    const spotifyToken = queryParams.get('spotify_token');
+    const appleToken = queryParams.get('apple_token');
 
     if (spotifyToken) {
       setAccessToken(spotifyToken);
       setProvider('spotify');
     }
-
-    // Check for Apple token in query params (from backend callback)
-    const queryParams = new URLSearchParams(window.location.search);
-    const appleToken = queryParams.get('apple_token');
 
     if (appleToken) {
       setAccessToken(appleToken);
@@ -82,7 +78,7 @@ function Index() {
   useEffect(() => {
     dispatch({
       type: Action.SET_CONTENT_SUBTITLE,
-      payload: 'Download your Spotify library.',
+      payload: 'Download your music library.',
     });
   }, [dispatch]);
 
@@ -123,9 +119,9 @@ function Index() {
           <Flex flexDirection="column" alignItems="center" w={'100%'}>
             <Button
               onClick={onSpotifyClick}
-              background="linear-gradient(to right, #000000, #1DB954)"
+              background="linear-gradient(90deg, #000000 0%, #1DB954 100%)"
               color="white"
-              borderRadius={100}
+              rounded={'xl'}
               display="flex"
               alignItems="center"
               justifyContent="center"
@@ -148,9 +144,9 @@ function Index() {
           <Flex flexDirection="column" alignItems="center" w={'100%'}>
             <Button
               onClick={onAppleClick}
-              background="linear-gradient(to right, #FA233B, #FB5C74)"
+              background="linear-gradient(90deg, #D01030 0%, #FB5C74 100%)"
               color="white"
-              borderRadius={100}
+              rounded={'xl'}
               display="flex"
               alignItems="center"
               justifyContent="center"

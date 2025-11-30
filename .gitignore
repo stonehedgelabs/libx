@@ -2,6 +2,8 @@ venv/
 *.pyc
 *.cache
 *.env
+__pycache__
 flask_session/
 .idea/
+ngrok.config.yaml
 .vercel

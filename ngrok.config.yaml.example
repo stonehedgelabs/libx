@@ -1,0 +1,12 @@
+version: 3
+
+agent:
+  authtoken: $AUTH_TOKEN
+
+tunnels:
+  libx-api:
+    proto: http
+    addr: 8080
+  libx-www:
+    proto: http
+    addr: 3000

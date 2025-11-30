@@ -46,7 +46,7 @@ spotify_api_base_url = "https://api.spotify.com/v1"
 # Apple Music Configuration
 apple_team_id = os.environ.get("APPLE_TEAM_ID", "")
 apple_key_id = os.environ.get("APPLE_KEY_ID", "")
-apple_private_key = os.environ.get("APPLE_PRIVATE_KEY", "")
+apple_private_key = os.environ.get("APPLE_PRIVATE_KEY", "").replace("\\n", "\n")
 apple_client_id = os.environ.get("APPLE_CLIENT_ID", "")
 apple_redirect_uri = os.environ.get("APPLE_REDIRECT_URI", "")
 apple_music_api_base_url = "https://api.music.apple.com/v1"
@@ -98,6 +98,42 @@ def get_spotify_token(code: str) -> dict:
         raise
 
 
+def generate_apple_client_secret() -> str:
+    """Generate Apple Sign In client secret using JWT"""
+    try:
+        # Token expires in 6 months (maximum allowed by Apple)
+        expiration_time = int(time.time()) + (86400 * 180)
+
+        headers = {
+            "alg": "ES256",
+            "kid": apple_key_id
+        }
+
+        payload = {
+            "iss": apple_team_id,
+            "iat": int(time.time()),
+            "exp": expiration_time,
+            "aud": "https://appleid.apple.com",
+            "sub": apple_client_id
+        }
+
+        logger.debug(f"Generating JWT with team_id: {apple_team_id}, key_id: {apple_key_id}")
+        logger.debug(f"Private key length: {len(apple_private_key)}, starts with: {apple_private_key[:30]}")
+
+        token = jwt.encode(
+            payload,
+            apple_private_key,
+            algorithm="ES256",
+            headers=headers
+        )
+
+        logger.debug(f"Generated JWT token (first 50 chars): {token[:50]}")
+        return token
+    except Exception as e:
+        logger.error(f"Error generating Apple client secret: {e}")
+        raise
+
+
 def generate_apple_developer_token() -> str:
     """Generate Apple Music API developer token using JWT"""
     try:
@@ -134,13 +170,16 @@ def get_apple_music_user_token(code: str) -> dict:
     try:
         data = {
             "client_id": apple_client_id,
-            "client_secret": generate_apple_developer_token(),
+            "client_secret": generate_apple_client_secret(),
             "code": code,
             "grant_type": "authorization_code",
             "redirect_uri": apple_redirect_uri,
         }
 
+        logger.debug(f"Apple token request data: {data}")
         response = httpx.post(apple_token_url, data=data)
+        logger.debug(f"Apple token response status: {response.status_code}")
+        logger.debug(f"Apple token response body: {response.text}")
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -546,8 +585,28 @@ def download_spotify_library(filename: str):
 @app.route("/api/spotify/callback")
 @cross_origin(supports_credentials=True)
 def spotify_callback():
-    # Apparently Spotify is using Implicit Grant Flow?
-    return redirect("/")
+    """Handle Spotify OAuth callback"""
+    try:
+        code = request.args.get("code")
+
+        if not code:
+            logger.error("No authorization code received from Spotify")
+            return redirect("/?error=no_code")
+
+        # Exchange code for tokens
+        token_response = get_spotify_token(code)
+        access_token = token_response.get("access_token")
+
+        if not access_token:
+            logger.error("Failed to get access token from Spotify")
+            return redirect("/?error=token_exchange_failed")
+
+        # Redirect back to frontend with the token
+        return redirect(f"/?spotify_token={access_token}")
+
+    except Exception as e:
+        logger.error(f"Error in Spotify callback: {e}")
+        return redirect("/?error=spotify_auth_failed")
 
 
 @app.route("/api/apple/callback", methods=["POST", "GET"])
@@ -575,7 +634,7 @@ def apple_callback():
 
     except Exception as e:
         logger.error(f"Error in Apple callback: {e}")
-        return redirect(f"/?error={str(e)}")
+        return redirect("/?error=apple_auth_failed")
 
 
 @app.route("/api/apple/download/<filename>", methods=["GET"])
